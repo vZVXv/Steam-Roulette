@@ -940,7 +940,7 @@
                     winner.style.boxShadow = `0 0 80px ${colors[lastWonGame.color]}`;
                 }
                 if (Math.abs(randomOffset) < 5) unlockAchievement('epicenter');
-                if (Math.abs(randomOffset) > 200) unlockAchievement('close_call');
+                if (Math.abs(randomOffset) > 215) unlockAchievement('close_call');
                 if (lastWonGame.id === lastGameId) unlockAchievement('stability');
                 lastGameId = lastWonGame.id;
                 unlockAchievement('first_spin');
