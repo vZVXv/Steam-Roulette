@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Steam Roulette v2.5</title>
+    <title>Steam Roulette v2.6</title>
     <style>
         html, body {
             -ms-overflow-style: none; 
@@ -16,6 +16,15 @@
             background: #1b2838; color: white; font-family: 'Motiva Sans', Sans-serif; 
             display: flex; flex-direction: column; align-items: center; padding: 40px 0; margin: 0; min-height: 100vh; overflow-x: hidden;
             overflow-anchor: none; /* Запрет автоскролла */
+            /* Блокировка выделения текста */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Разрешаем выделение только в полях ввода и textarea для удобства импорта */
+        input, textarea, select {
+            user-select: auto;
+            -webkit-user-select: auto;
         }
 
         /* СТАРТОВЫЙ ЭКРАН */
@@ -119,11 +128,11 @@
         pre { background: #0f161e; padding: 15px; border-radius: 6px; border: 1px solid #1c2a38; overflow-x: auto; color: #a3c9e6; font-family: monospace; }
         kbd { background: #2a475e; color: #fff; padding: 3px 8px; border-radius: 4px; font-family: monospace; box-shadow: 0 2px 0 #1b2838; font-size: 13px; }
         .highlight { color: #e67e22; font-weight: bold; }
-/* Стили для настройки шансов - теперь компактнее */
+
         .weight-input { background: #0f161f; color: white; border: 1px solid #2a475e; padding: 4px; border-radius: 4px; width: 50px; text-align: center; font-family: monospace; font-size: 13px; }
         .weight-input:focus { outline: none; border-color: #66c0f4; }
         
-        /* Сетка для двух колонок */
+        /* Сетка для двух колонок весов в настройках */
         #weights-container { 
             display: grid; 
             grid-template-columns: 1fr 1fr; /* Две колонки */
@@ -142,8 +151,7 @@
             border-radius: 4px; 
             border-left: 3px solid; 
         }
-        
-		</style>
+    </style>
 </head>
 <body>
     <canvas id="bg-canvas"></canvas>
@@ -281,7 +289,8 @@
                 
                 <div style="display: flex; flex-direction: column; gap: 20px; background: rgba(0,0,0,0.3); padding: 25px; border-radius: 8px; border: 1px solid #2a475e; align-self: start;">
                     <h3 style="color: #a3c9e6; margin: 0 0 -5px 0;">Управление данными</h3>
-                    <button onclick="exportLibrary()" style="background: #27ae60; padding: 20px; font-size: 16px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: white;">💾 Экспорт всей Библиотеки (Полный бэкап)</button>
+                    <button onclick="exportLibrary()" style="background: #27ae60; padding: 20px; font-size: 16px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: white;">💾 Экспорт Библиотеки и Достижений</button>
+                    <button onclick="document.getElementById('file-selector').click()" style="background: #8e44ad; padding: 15px; font-size: 16px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: white;">📂 Загрузить JSON библиотеки</button>
                     <div style="border-top: 1px solid #2a475e; margin: 10px 0;"></div>
                     <button onclick="clearHistory()" style="background: #e67e22; padding: 15px; font-size: 16px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: white;">🧹 Очистить историю круток</button>
                     <button onclick="fullReset()" style="background: #eb4b4b; padding: 15px; font-size: 16px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: white;">⚠️ Полный сброс (Удалить все данные)</button>
@@ -290,8 +299,8 @@
                 <div style="display: flex; flex-direction: column; gap: 15px; background: rgba(0,0,0,0.3); padding: 25px; border-radius: 8px; border: 1px solid #2a475e;">
                     <h3 style="color: #a3c9e6; margin: 0;">Настройка шансов (Веса)</h3>
                     <p style="color: #8f98a0; font-size: 12px; margin: 0;">Чем выше число по сравнению с другими, тем больше шанс. 0 — полностью исключить редкость.</p>
-                    <div id="weights-container" style="display: grid; grid-template-columns: 1fr; gap: 8px; max-height: 350px; overflow-y: auto; padding-right: 5px;">
-                        </div>
+                    <div id="weights-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 350px; overflow-y: auto; padding-right: 5px;">
+                    </div>
                     <button onclick="saveWeights()" style="background: #2a475e; color: #66c0f4; padding: 15px; font-size: 16px; margin-top: 10px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.2s;">💾 Применить и сохранить</button>
                 </div>
 
@@ -324,8 +333,11 @@
     </div>
 
     <script>
+        // Блокировка нажатия правой кнопки мыши (ПКМ)
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
         const CONFIG = {
-            version: "v2.5",
+            version: "v2.6",
             LINKS: {
                 steamImg: "https://shared.fastly.steamstatic.com",
                 steamRun: "steam://run/",
@@ -335,7 +347,7 @@
 
         if ('serviceWorker' in navigator) {
             const swCode = `
-                const CACHE_NAME = 'steam-images-v2.5';
+                const CACHE_NAME = 'steam-images-v2.6';
                 self.addEventListener('fetch', (event) => {
                     if (event.request.url.includes('steamstatic.com')) {
                         event.respondWith(
@@ -560,13 +572,24 @@
             return 'common';
         }
 
-        // --- ЭКСПОРТ ВСЕЙ БИБЛИОТЕКИ (ИЗ НАСТРОЕК) ---
+        // --- ЭКСПОРТ БИБЛИОТЕКИ И ЗАШИФРОВАННЫХ ДОСТИЖЕНИЙ ---
         function exportLibrary() {
             if (myGames.length === 0) { alert("Библиотека пуста!"); return; }
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(myGames, null, 2));
+            
+            // Получаем достижения, кодируем в Base64 и разворачиваем строку задом наперед
+            const achData = localStorage.getItem('steam_roulette_achievements') || '{}';
+            const encodedAch = btoa(encodeURIComponent(achData)).split('').reverse().join('');
+            
+            const exportData = {
+                version: CONFIG.version,
+                games: myGames,
+                security_token: "SR_SEC_" + encodedAch // Защищенный контейнер
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
             const downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "steam_roulette_library.json");
+            downloadAnchor.setAttribute("download", "steam_roulette_backup.json");
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
@@ -588,7 +611,7 @@
             downloadAnchor.remove();
         }
 
-        // Загрузка JSON со стартового экрана (Полная замена)
+        // Загрузка JSON базы данных (Из настроек и стартового экрана)
         function handleManualUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -596,16 +619,65 @@
             reader.onload = function(e) {
                 try {
                     const data = JSON.parse(e.target.result);
-                    myGames = data.filter(item => item.id);
+                    let importedGames = [];
+
+                    // Поддержка старого формата бэкапов (простой массив) и нового сложного
+                    if (Array.isArray(data)) {
+                        importedGames = data;
+                    } else if (data && typeof data === 'object') {
+                        if (data.games) importedGames = data.games;
+                        
+                        // Попытка расшифровать и объединить достижения
+                        if (data.security_token && data.security_token.startsWith("SR_SEC_")) {
+                            try {
+                                const rawEncoded = data.security_token.replace("SR_SEC_", "").split('').reverse().join('');
+                                const decodedAch = JSON.parse(decodeURIComponent(atob(rawEncoded)));
+                                userAchievements = { ...userAchievements, ...decodedAch };
+                                localStorage.setItem('steam_roulette_achievements', JSON.stringify(userAchievements));
+                                if (document.getElementById('achievements-overlay').style.display === 'block') {
+                                    renderAchievements();
+                                }
+                            } catch (achErr) {
+                                console.error("Ошибка восстановления защищенных достижений:", achErr);
+                            }
+                        }
+                    }
+
+                    myGames = importedGames.filter(item => item.id);
                     myGames.forEach(g => { if(!g.color) g.color = 'common'; });
                     if (containsKeyword(file.name) || myGames.some(g => containsKeyword(g.name))) unlockAchievement('no_hentai');
                     
                     saveLibrary();
-                    document.getElementById('start-screen').style.display = 'none';
-                    preloadImages(myGames.filter(g => !g.deleted)); 
+                    updateStats();
+                    
+                    // Если загружали из стартового экрана
+                    if (document.getElementById('start-screen').style.display !== 'none') {
+                        document.getElementById('start-screen').style.display = 'none';
+                        preloadImages(myGames.filter(g => !g.deleted)); 
+                    } else {
+                        // Если загружали через настройки во время работы приложения
+                        alert("База данных и достижения успешно восстановлены!");
+                        toggleSettings(false);
+                        renderLibrary();
+                        
+                        // Сброс и инициализация рулетки новыми играми
+                        const activeGames = myGames.filter(g => !g.deleted);
+                        document.getElementById('spin-btn').disabled = activeGames.length === 0;
+                        document.getElementById('winner-display').textContent = activeGames.length === 0 ? "НЕТ АКТИВНЫХ ИГР" : "ГОТОВО К ПРОКРУТКЕ";
+                        
+                        const track = document.getElementById('track');
+                        track.innerHTML = '';
+                        if (activeGames.length > 0) {
+                            for (let i = 0; i < 12; i++) {
+                                const game = weightedRandom();
+                                if (game) track.appendChild(createNode(game)).classList.add('item-animate');
+                            }
+                        }
+                    }
                 } catch (err) {
                     alert("Ошибка чтения JSON. Проверьте структуру файла.");
                 }
+                event.target.value = ''; // Сбрасываем значение инпута
             };
             reader.readAsText(file);
         }
@@ -624,10 +696,9 @@
                     importedGames.forEach(importedGame => {
                         const existingGame = myGames.find(g => g.id === importedGame.id);
                         if (existingGame) {
-                            existingGame.deleted = true; // Отправляем в корзину
+                            existingGame.deleted = true; 
                             if (importedGame.color) existingGame.color = importedGame.color;
                         } else {
-                            // Если игры вообще нет в библиотеке, добавляем её сразу в корзину
                             importedGame.deleted = true;
                             if (!importedGame.color) importedGame.color = 'trash';
                             myGames.push(importedGame);
@@ -647,7 +718,7 @@
                 } catch (err) {
                     alert("Ошибка чтения JSON. Проверьте структуру файла.");
                 }
-                event.target.value = ''; // Сбрасываем инпут
+                event.target.value = ''; 
             };
             reader.readAsText(file);
         }
@@ -927,7 +998,6 @@
             const labels = { trash: "Мусорные", common: "Обычные", uncommon: "Необычные", rare: "Редкие", epic: "Эпические", legendary: "Легендарные", mythic: "Мифические", godly: "Дар Богов" };
             const colors = { trash: '#8f98a0', common: '#ffffff', uncommon: '#32cd32', rare: '#4b69ff', epic: '#8847ff', legendary: '#caab05', mythic: '#eb4b4b', godly: '#40e0d0' };
             
-            // Сортировка: сначала активные по редкости, затем удаленные
             const sorted = [...myGames].sort((a, b) => {
                 if (a.deleted && !b.deleted) return 1;
                 if (!a.deleted && b.deleted) return -1;
@@ -937,7 +1007,6 @@
             let currentSection = null;
 
             sorted.forEach(game => {
-                // Логика создания заголовков разделов
                 if (game.deleted) {
                     if (currentSection !== 'deleted') {
                         const divider = document.createElement('div');
@@ -950,7 +1019,6 @@
                     if (currentSection !== game.color) {
                         const divider = document.createElement('div');
                         const secColor = colors[game.color] || '#ffffff';
-                        // Заменяем оригинальный #4b4b4b для Trash на чуть более светлый #8f98a0 для читаемости текста заголовка
                         divider.style.cssText = `grid-column: 1 / -1; color: ${secColor}; font-weight: bold; font-size: 18px; border-bottom: 2px solid ${secColor}; margin-top: 25px; padding-bottom: 5px; text-align: center; text-transform: uppercase; text-shadow: 0 0 10px rgba(0,0,0,0.5);`;
                         divider.textContent = labels[game.color] || "Неизвестная редкость";
                         grid.appendChild(divider);
@@ -989,14 +1057,13 @@
                 const select = document.createElement('select');
                 select.className = 'lib-card-select';
                 select.disabled = game.deleted; 
-                select.style.color = colors[game.color]; // Цвет самого селекта
+                select.style.color = colors[game.color]; 
                 select.style.fontWeight = "bold";
                 
                 Object.keys(labels).forEach(rarityKey => {
                     const opt = document.createElement('option');
                     opt.value = rarityKey;
                     opt.textContent = labels[rarityKey];
-                    // Раскрашиваем опции в выпадающем списке
                     opt.style.color = colors[rarityKey];
                     opt.style.background = "#0f161f";
                     opt.style.fontWeight = "bold";
@@ -1011,9 +1078,8 @@
                         globalGame.color = newColor;
                         saveLibrary();
                         updateStats();
-                        renderLibrary(); // Перерисовка для мгновенного перемещения в новую колонку
+                        renderLibrary(); 
                         
-                        // Если игра осталась единственной/закончились игры при смене
                         const activeGames = myGames.filter(g => !g.deleted);
                         document.getElementById('spin-btn').disabled = activeGames.length === 0;
                         document.getElementById('winner-display').textContent = activeGames.length === 0 ? "НЕТ АКТИВНЫХ ИГР" : "ГОТОВО К ПРОКРУТКЕ";
@@ -1030,7 +1096,7 @@
                         globalGame.deleted = !globalGame.deleted;
                         saveLibrary();
                         updateStats();
-                        renderLibrary(); // Перерисовка для перемещения в/из удаленных
+                        renderLibrary(); 
                         
                         const activeGames = myGames.filter(g => !g.deleted);
                         document.getElementById('spin-btn').disabled = activeGames.length === 0;
@@ -1053,7 +1119,6 @@
                 grid.appendChild(card);
             });
 
-            // Блок с кнопками JSON в самом низу библиотеки
             const actionsDiv = document.createElement('div');
             actionsDiv.style.cssText = "grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-top: 40px; padding-top: 30px; border-top: 2px dashed #eb4b4b;";
             
