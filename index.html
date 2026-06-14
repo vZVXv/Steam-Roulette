@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Steam Roulette v2.6</title>
+    <title>Steam Roulette v2.7</title>
     <style>
         html, body {
             -ms-overflow-style: none; 
@@ -288,7 +288,7 @@
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
                 
                 <div style="display: flex; flex-direction: column; gap: 20px; background: rgba(0,0,0,0.3); padding: 25px; border-radius: 8px; border: 1px solid #2a475e; align-self: start;">
-                    <h3 style="color: #a3c9e6; margin: 0 0 -5px 0;">Управление данными</h3>
+                    <h3 style="color: #a3c9e6; margin: 0 0 -5px 0;">Управление данных</h3>
                     <button onclick="exportLibrary()" style="background: #27ae60; padding: 20px; font-size: 16px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: white;">💾 Экспорт Библиотеки и Достижений</button>
                     <button onclick="document.getElementById('file-selector').click()" style="background: #8e44ad; padding: 15px; font-size: 16px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: white;">📂 Загрузить JSON библиотеки</button>
                     <div style="border-top: 1px solid #2a475e; margin: 10px 0;"></div>
@@ -302,6 +302,16 @@
                     <div id="weights-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 350px; overflow-y: auto; padding-right: 5px;">
                     </div>
                     <button onclick="saveWeights()" style="background: #2a475e; color: #66c0f4; padding: 15px; font-size: 16px; margin-top: 10px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.2s;">💾 Применить и сохранить</button>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 15px; background: rgba(0,0,0,0.3); padding: 25px; border-radius: 8px; border: 1px solid #2a475e; grid-column: 1 / -1;">
+                    <h3 style="color: #a3c9e6; margin: 0;">🔊 Управление звуком</h3>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span style="color: #8f98a0; font-weight: bold;">Громкость:</span>
+                        <input type="range" id="volume-slider" min="0" max="5" step="0.1" value="1" oninput="updateVolume(this.value)" style="flex: 1; cursor: pointer; accent-color: #66c0f4;">
+                        <span id="volume-display" style="color: white; font-weight: bold; width: 50px; text-align: right;">100%</span>
+                    </div>
+                    <button onclick="playTick()" style="background: #233c51; color: #66c0f4; border: 1px solid #2a475e; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; transition: 0.2s;">Проверить звук (Тик)</button>
                 </div>
 
             </div>
@@ -337,7 +347,7 @@
         document.addEventListener('contextmenu', event => event.preventDefault());
 
         const CONFIG = {
-            version: "v2.6",
+            version: "v2.7",
             LINKS: {
                 steamImg: "https://shared.fastly.steamstatic.com",
                 steamRun: "steam://run/",
@@ -347,7 +357,7 @@
 
         if ('serviceWorker' in navigator) {
             const swCode = `
-                const CACHE_NAME = 'steam-images-v2.6';
+                const CACHE_NAME = 'steam-images-v2.7';
                 self.addEventListener('fetch', (event) => {
                     if (event.request.url.includes('steamstatic.com')) {
                         event.respondWith(
@@ -373,6 +383,9 @@
         let libraryOpens = parseInt(localStorage.getItem('stats_library_opens') || '0');
         let userAchievements = JSON.parse(localStorage.getItem('steam_roulette_achievements') || '{}');
         let gamesSinceClear = parseInt(localStorage.getItem('gamesSinceClear') || '0', 10);
+        
+        // НОВАЯ ПЕРЕМЕННАЯ ДЛЯ ГРОМКОСТИ
+        let globalVolume = parseFloat(localStorage.getItem('steam_roulette_volume') || '1.0');
 
         const ITEM_WIDTH = 480; 
         
@@ -489,10 +502,25 @@
         function toggleHelp(show) { document.getElementById('help-overlay').style.display = show ? 'block' : 'none'; document.body.style.overflow = show ? 'hidden' : ''; }
         function toggleImport(show) { document.getElementById('import-overlay').style.display = show ? 'block' : 'none'; document.body.style.overflow = show ? 'hidden' : ''; }
         
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ НАСТРОЕК (ПРИВЯЗКА ПОЛЗУНКА)
         function toggleSettings(show) { 
             document.getElementById('settings-overlay').style.display = show ? 'block' : 'none'; 
             document.body.style.overflow = show ? 'hidden' : '';
-            if (show) renderWeightsConfig(); 
+            if (show) {
+                renderWeightsConfig(); 
+                const slider = document.getElementById('volume-slider');
+                if (slider) {
+                    slider.value = globalVolume;
+                    document.getElementById('volume-display').textContent = Math.round(globalVolume * 100) + '%';
+                }
+            }
+        }
+
+        // НОВАЯ ФУНКЦИЯ ДЛЯ ОБНОВЛЕНИЯ ГРОМКОСТИ
+        function updateVolume(val) {
+            globalVolume = parseFloat(val);
+            localStorage.setItem('steam_roulette_volume', globalVolume);
+            document.getElementById('volume-display').textContent = Math.round(globalVolume * 100) + '%';
         }
 
         function renderWeightsConfig() {
@@ -572,18 +600,15 @@
             return 'common';
         }
 
-        // --- ЭКСПОРТ БИБЛИОТЕКИ И ЗАШИФРОВАННЫХ ДОСТИЖЕНИЙ ---
         function exportLibrary() {
             if (myGames.length === 0) { alert("Библиотека пуста!"); return; }
-            
-            // Получаем достижения, кодируем в Base64 и разворачиваем строку задом наперед
             const achData = localStorage.getItem('steam_roulette_achievements') || '{}';
             const encodedAch = btoa(encodeURIComponent(achData)).split('').reverse().join('');
             
             const exportData = {
                 version: CONFIG.version,
                 games: myGames,
-                security_token: "SR_SEC_" + encodedAch // Защищенный контейнер
+                security_token: "SR_SEC_" + encodedAch 
             };
 
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
@@ -595,7 +620,6 @@
             downloadAnchor.remove();
         }
 
-        // --- ЭКСПОРТ ТОЛЬКО УДАЛЕННЫХ ИГР (ИЗ БИБЛИОТЕКИ) ---
         function exportDeletedGames() {
             const deletedGames = myGames.filter(g => g.deleted);
             if (deletedGames.length === 0) {
@@ -611,7 +635,6 @@
             downloadAnchor.remove();
         }
 
-        // Загрузка JSON базы данных (Из настроек и стартового экрана)
         function handleManualUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -621,13 +644,10 @@
                     const data = JSON.parse(e.target.result);
                     let importedGames = [];
 
-                    // Поддержка старого формата бэкапов (простой массив) и нового сложного
                     if (Array.isArray(data)) {
                         importedGames = data;
                     } else if (data && typeof data === 'object') {
                         if (data.games) importedGames = data.games;
-                        
-                        // Попытка расшифровать и объединить достижения
                         if (data.security_token && data.security_token.startsWith("SR_SEC_")) {
                             try {
                                 const rawEncoded = data.security_token.replace("SR_SEC_", "").split('').reverse().join('');
@@ -650,17 +670,14 @@
                     saveLibrary();
                     updateStats();
                     
-                    // Если загружали из стартового экрана
                     if (document.getElementById('start-screen').style.display !== 'none') {
                         document.getElementById('start-screen').style.display = 'none';
                         preloadImages(myGames.filter(g => !g.deleted)); 
                     } else {
-                        // Если загружали через настройки во время работы приложения
                         alert("База данных и достижения успешно восстановлены!");
                         toggleSettings(false);
                         renderLibrary();
                         
-                        // Сброс и инициализация рулетки новыми играми
                         const activeGames = myGames.filter(g => !g.deleted);
                         document.getElementById('spin-btn').disabled = activeGames.length === 0;
                         document.getElementById('winner-display').textContent = activeGames.length === 0 ? "НЕТ АКТИВНЫХ ИГР" : "ГОТОВО К ПРОКРУТКЕ";
@@ -677,12 +694,11 @@
                 } catch (err) {
                     alert("Ошибка чтения JSON. Проверьте структуру файла.");
                 }
-                event.target.value = ''; // Сбрасываем значение инпута
+                event.target.value = ''; 
             };
             reader.readAsText(file);
         }
 
-        // --- ЗАГРУЗКА ИМЕННО КОРЗИНЫ (ИЗ БИБЛИОТЕКИ) ---
         function handleTrashImport(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -821,20 +837,26 @@
             });
         }
 
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ ТИКА С ГРОМКОСТЬЮ
         function playTick() {
+            if (globalVolume <= 0) return;
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = 'sine';
             osc.frequency.setValueAtTime(150, audioCtx.currentTime); 
             osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.1); 
-            gain.gain.setValueAtTime(0.05, audioCtx.currentTime); 
+            
+            gain.gain.setValueAtTime(0.05 * globalVolume, audioCtx.currentTime); 
             gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1); 
+            
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.start(); osc.stop(audioCtx.currentTime + 0.12);
         }
 
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ ПОБЕДЫ С ГРОМКОСТЬЮ
         function playVictorySound() {
+            if (globalVolume <= 0) return;
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             audioCtx.resume().then(() => {
                 const notes = [261.63, 329.63, 392.00, 523.25];
@@ -845,8 +867,10 @@
                     osc.type = 'triangle';
                     osc.frequency.setValueAtTime(f, now + (i * 0.1));
                     gain.gain.setValueAtTime(0, now + (i * 0.1));
-                    gain.gain.linearRampToValueAtTime(0.15, now + (i * 0.1) + 0.05); 
+                    
+                    gain.gain.linearRampToValueAtTime(0.15 * globalVolume, now + (i * 0.1) + 0.05); 
                     gain.gain.exponentialRampToValueAtTime(0.001, now + (i * 0.1) + 0.5);
+                    
                     osc.connect(gain); gain.connect(audioCtx.destination);
                     osc.start(now + (i * 0.1)); osc.stop(now + (i * 0.1) + 0.6);
                 });
