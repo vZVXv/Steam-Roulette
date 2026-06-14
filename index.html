@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Steam Roulette v2.2</title>
+    <title>Steam Roulette v2.4</title>
     <style>
         html, body {
             -ms-overflow-style: none; 
@@ -289,7 +289,7 @@
 
     <script>
         const CONFIG = {
-            version: "v2.2",
+            version: "v2.4",
             LINKS: {
                 steamImg: "https://shared.fastly.steamstatic.com",
                 steamRun: "steam://run/",
@@ -299,7 +299,7 @@
 
         if ('serviceWorker' in navigator) {
             const swCode = `
-                const CACHE_NAME = 'steam-images-v2.2';
+                const CACHE_NAME = 'steam-images-v2.4';
                 self.addEventListener('fetch', (event) => {
                     if (event.request.url.includes('steamstatic.com')) {
                         event.respondWith(
@@ -845,29 +845,43 @@
             } else { document.body.style.overflow = ''; }
         }
 
-        function renderLibrary() {
+function renderLibrary() {
             const grid = document.getElementById('library-grid'); 
             grid.innerHTML = '';
             
             const order = { godly: 1, mythic: 2, legendary: 3, epic: 4, rare: 5, uncommon: 6, common: 7, trash: 8 };
+            const labels = { trash: "Мусорные", common: "Обычные", uncommon: "Необычные", rare: "Редкие", epic: "Эпические", legendary: "Легендарные", mythic: "Мифические", godly: "Дар Богов" };
+            const colors = { trash: '#8f98a0', common: '#ffffff', uncommon: '#32cd32', rare: '#4b69ff', epic: '#8847ff', legendary: '#caab05', mythic: '#eb4b4b', godly: '#40e0d0' };
             
+            // Сортировка: сначала активные по редкости, затем удаленные
             const sorted = [...myGames].sort((a, b) => {
                 if (a.deleted && !b.deleted) return 1;
                 if (!a.deleted && b.deleted) return -1;
                 return (order[a.color] || 99) - (order[b.color] || 99);
             });
             
-            const labels = { trash: "Мусор", common: "Обычная", uncommon: "Необычная", rare: "Редкая", epic: "Эпическая", legendary: "Легендарная", mythic: "Мифическая", godly: "Дар Богов" };
-            
-            let deletedDividerAdded = false;
+            let currentSection = null;
 
             sorted.forEach(game => {
-                if (game.deleted && !deletedDividerAdded) {
-                    const divider = document.createElement('div');
-                    divider.style.cssText = "grid-column: 1 / -1; color: #eb4b4b; font-weight: bold; font-size: 18px; border-bottom: 2px solid #eb4b4b; margin-top: 15px; padding-bottom: 5px; text-align: center;";
-                    divider.textContent = "УДАЛЁННЫЕ ИГРЫ (ИСКЛЮЧЕНЫ ИЗ РУЛЕТКИ)";
-                    grid.appendChild(divider);
-                    deletedDividerAdded = true;
+                // Логика создания заголовков разделов
+                if (game.deleted) {
+                    if (currentSection !== 'deleted') {
+                        const divider = document.createElement('div');
+                        divider.style.cssText = "grid-column: 1 / -1; color: #eb4b4b; font-weight: bold; font-size: 18px; border-bottom: 2px solid #eb4b4b; margin-top: 25px; padding-bottom: 5px; text-align: center; text-transform: uppercase;";
+                        divider.textContent = "УДАЛЁННЫЕ ИГРЫ (ИСКЛЮЧЕНЫ ИЗ РУЛЕТКИ)";
+                        grid.appendChild(divider);
+                        currentSection = 'deleted';
+                    }
+                } else {
+                    if (currentSection !== game.color) {
+                        const divider = document.createElement('div');
+                        const secColor = colors[game.color] || '#ffffff';
+                        // Заменяем оригинальный #4b4b4b для Trash на чуть более светлый #8f98a0 для читаемости текста заголовка
+                        divider.style.cssText = `grid-column: 1 / -1; color: ${secColor}; font-weight: bold; font-size: 18px; border-bottom: 2px solid ${secColor}; margin-top: 25px; padding-bottom: 5px; text-align: center; text-transform: uppercase; text-shadow: 0 0 10px rgba(0,0,0,0.5);`;
+                        divider.textContent = labels[game.color] || "Неизвестная редкость";
+                        grid.appendChild(divider);
+                        currentSection = game.color;
+                    }
                 }
 
                 const card = document.createElement('div'); 
@@ -901,10 +915,17 @@
                 const select = document.createElement('select');
                 select.className = 'lib-card-select';
                 select.disabled = game.deleted; 
+                select.style.color = colors[game.color]; // Цвет самого селекта
+                select.style.fontWeight = "bold";
+                
                 Object.keys(labels).forEach(rarityKey => {
                     const opt = document.createElement('option');
                     opt.value = rarityKey;
                     opt.textContent = labels[rarityKey];
+                    // Раскрашиваем опции в выпадающем списке
+                    opt.style.color = colors[rarityKey];
+                    opt.style.background = "#0f161f";
+                    opt.style.fontWeight = "bold";
                     if (game.color === rarityKey) opt.selected = true;
                     select.appendChild(opt);
                 });
@@ -916,7 +937,12 @@
                         globalGame.color = newColor;
                         saveLibrary();
                         updateStats();
-                        card.className = `lib-card ${newColor}`;
+                        renderLibrary(); // Перерисовка для мгновенного перемещения в новую колонку
+                        
+                        // Если игра осталась единственной/закончились игры при смене
+                        const activeGames = myGames.filter(g => !g.deleted);
+                        document.getElementById('spin-btn').disabled = activeGames.length === 0;
+                        document.getElementById('winner-display').textContent = activeGames.length === 0 ? "НЕТ АКТИВНЫХ ИГР" : "ГОТОВО К ПРОКРУТКЕ";
                     }
                 };
 
@@ -930,7 +956,7 @@
                         globalGame.deleted = !globalGame.deleted;
                         saveLibrary();
                         updateStats();
-                        renderLibrary(); 
+                        renderLibrary(); // Перерисовка для перемещения в/из удаленных
                         
                         const activeGames = myGames.filter(g => !g.deleted);
                         document.getElementById('spin-btn').disabled = activeGames.length === 0;
@@ -953,13 +979,13 @@
                 grid.appendChild(card);
             });
 
-            // --- БЛОК С КНОПКАМИ JSON В САМОМ НИЗУ БИБЛИОТЕКИ ---
+            // Блок с кнопками JSON в самом низу библиотеки
             const actionsDiv = document.createElement('div');
             actionsDiv.style.cssText = "grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-top: 40px; padding-top: 30px; border-top: 2px dashed #eb4b4b;";
             
             const exportBtn = document.createElement('button');
             exportBtn.innerHTML = '💾 Сохранить удалённые (JSON)';
-            exportBtn.style.background = '#eb4b4b'; // Красная кнопка, так как это резерв корзины
+            exportBtn.style.background = '#eb4b4b'; 
             exportBtn.onclick = exportDeletedGames;
 
             const importBtn = document.createElement('button');
