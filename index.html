@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Steam Roulette v2.4</title>
+    <title>Steam Roulette v2.5</title>
     <style>
         html, body {
             -ms-overflow-style: none; 
@@ -119,7 +119,31 @@
         pre { background: #0f161e; padding: 15px; border-radius: 6px; border: 1px solid #1c2a38; overflow-x: auto; color: #a3c9e6; font-family: monospace; }
         kbd { background: #2a475e; color: #fff; padding: 3px 8px; border-radius: 4px; font-family: monospace; box-shadow: 0 2px 0 #1b2838; font-size: 13px; }
         .highlight { color: #e67e22; font-weight: bold; }
-    </style>
+/* Стили для настройки шансов - теперь компактнее */
+        .weight-input { background: #0f161f; color: white; border: 1px solid #2a475e; padding: 4px; border-radius: 4px; width: 50px; text-align: center; font-family: monospace; font-size: 13px; }
+        .weight-input:focus { outline: none; border-color: #66c0f4; }
+        
+        /* Сетка для двух колонок */
+        #weights-container { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; /* Две колонки */
+            gap: 8px; 
+            max-height: 400px; 
+            overflow-y: auto; 
+            padding-right: 5px;
+        }
+        
+        .weight-row { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            background: #16202d; 
+            padding: 6px 8px; 
+            border-radius: 4px; 
+            border-left: 3px solid; 
+        }
+        
+		</style>
 </head>
 <body>
     <canvas id="bg-canvas"></canvas>
@@ -134,7 +158,6 @@
             <button onclick="toggleHelp(true)" style="background: #d35400;">📖 Инструкция</button>
             <button onclick="toggleImport(true)" style="background: #8e44ad;">📋 Импорт Игр</button>
             <input type="file" id="file-selector" style="display: none;" accept=".json" onchange="handleManualUpload(event)">
-            <!-- Инпут для загрузки только удаленных игр -->
             <input type="file" id="trash-import-file" style="display: none;" accept=".json" onchange="handleTrashImport(event)">
             <button onclick="document.getElementById('file-selector').click()" style="background: #3d4450;">📁 Загрузить JSON (Все игры)</button>
         </div>
@@ -249,16 +272,29 @@
     </div>
 
     <div id="settings-overlay" class="library-overlay">
-        <div class="library-content" style="max-width: 600px;">
+        <div class="library-content" style="max-width: 900px;">
             <div class="library-header">
                 <h2 style="color: #a3c9e6; margin: 0;">⚙️ НАСТРОЙКИ</h2>
                 <button onclick="toggleSettings(false)" style="background:none; color:white; border:none; font-size: 35px; cursor:pointer;">✕</button>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 20px; background: rgba(0,0,0,0.3); padding: 25px; border-radius: 8px; border: 1px solid #2a475e;">
-                <button onclick="exportLibrary()" style="background: #27ae60; padding: 20px; font-size: 16px;">💾 Экспорт всей Библиотеки (Полный бэкап)</button>
-                <div style="border-top: 1px solid #2a475e; margin: 10px 0;"></div>
-                <button onclick="clearHistory()" style="background: #e67e22; padding: 15px; font-size: 16px;">🧹 Очистить историю круток</button>
-                <button onclick="fullReset()" style="background: #eb4b4b; padding: 15px; font-size: 16px;">⚠️ Полный сброс (Удалить все данные)</button>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                
+                <div style="display: flex; flex-direction: column; gap: 20px; background: rgba(0,0,0,0.3); padding: 25px; border-radius: 8px; border: 1px solid #2a475e; align-self: start;">
+                    <h3 style="color: #a3c9e6; margin: 0 0 -5px 0;">Управление данными</h3>
+                    <button onclick="exportLibrary()" style="background: #27ae60; padding: 20px; font-size: 16px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: white;">💾 Экспорт всей Библиотеки (Полный бэкап)</button>
+                    <div style="border-top: 1px solid #2a475e; margin: 10px 0;"></div>
+                    <button onclick="clearHistory()" style="background: #e67e22; padding: 15px; font-size: 16px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: white;">🧹 Очистить историю круток</button>
+                    <button onclick="fullReset()" style="background: #eb4b4b; padding: 15px; font-size: 16px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; color: white;">⚠️ Полный сброс (Удалить все данные)</button>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 15px; background: rgba(0,0,0,0.3); padding: 25px; border-radius: 8px; border: 1px solid #2a475e;">
+                    <h3 style="color: #a3c9e6; margin: 0;">Настройка шансов (Веса)</h3>
+                    <p style="color: #8f98a0; font-size: 12px; margin: 0;">Чем выше число по сравнению с другими, тем больше шанс. 0 — полностью исключить редкость.</p>
+                    <div id="weights-container" style="display: grid; grid-template-columns: 1fr; gap: 8px; max-height: 350px; overflow-y: auto; padding-right: 5px;">
+                        </div>
+                    <button onclick="saveWeights()" style="background: #2a475e; color: #66c0f4; padding: 15px; font-size: 16px; margin-top: 10px; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.2s;">💾 Применить и сохранить</button>
+                </div>
+
             </div>
         </div>
     </div>
@@ -289,7 +325,7 @@
 
     <script>
         const CONFIG = {
-            version: "v2.4",
+            version: "v2.5",
             LINKS: {
                 steamImg: "https://shared.fastly.steamstatic.com",
                 steamRun: "steam://run/",
@@ -299,7 +335,7 @@
 
         if ('serviceWorker' in navigator) {
             const swCode = `
-                const CACHE_NAME = 'steam-images-v2.4';
+                const CACHE_NAME = 'steam-images-v2.5';
                 self.addEventListener('fetch', (event) => {
                     if (event.request.url.includes('steamstatic.com')) {
                         event.respondWith(
@@ -328,10 +364,11 @@
 
         const ITEM_WIDTH = 480; 
         
-        const rarityWeights = { 
+        const defaultWeights = { 
             trash: 30, common: 50, uncommon: 75, rare: 65, 
             epic: 55, legendary: 40, mythic: 30, godly: 10 
         };
+        let rarityWeights = JSON.parse(localStorage.getItem('steam_roulette_weights')) || { ...defaultWeights };
         
         const hentaiKeywords = ['hentai', 'Sex', 'Furry', 'adult', 'nsfw', 'Titty', 'Miss Neko', 'Mirror', 'My Cute', 'XXX', 'Anthro Heat', 'Agony UNRATED', 'Anomalous Coffee Machine'];
         const hentaiRegexes = hentaiKeywords.map(keyword => new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'));
@@ -439,7 +476,44 @@
 
         function toggleHelp(show) { document.getElementById('help-overlay').style.display = show ? 'block' : 'none'; document.body.style.overflow = show ? 'hidden' : ''; }
         function toggleImport(show) { document.getElementById('import-overlay').style.display = show ? 'block' : 'none'; document.body.style.overflow = show ? 'hidden' : ''; }
-        function toggleSettings(show) { document.getElementById('settings-overlay').style.display = show ? 'block' : 'none'; document.body.style.overflow = show ? 'hidden' : ''; }
+        
+        function toggleSettings(show) { 
+            document.getElementById('settings-overlay').style.display = show ? 'block' : 'none'; 
+            document.body.style.overflow = show ? 'hidden' : '';
+            if (show) renderWeightsConfig(); 
+        }
+
+        function renderWeightsConfig() {
+            const container = document.getElementById('weights-container');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            const labels = { trash: "Мусорные", common: "Обычные", uncommon: "Необычные", rare: "Редкие", epic: "Эпические", legendary: "Легендарные", mythic: "Мифические", godly: "Дар Богов" };
+            const colors = { trash: '#8f98a0', common: '#ffffff', uncommon: '#32cd32', rare: '#4b69ff', epic: '#8847ff', legendary: '#caab05', mythic: '#eb4b4b', godly: '#40e0d0' };
+            
+            Object.keys(rarityWeights).forEach(key => {
+                const row = document.createElement('div');
+                row.className = 'weight-row';
+                row.style.borderLeftColor = colors[key];
+                row.innerHTML = `
+                    <span style="color: ${colors[key]}; font-size: 14px; font-weight: bold; text-shadow: 0 0 5px rgba(0,0,0,0.8);">${labels[key]}</span>
+                    <input type="number" id="weight-${key}" class="weight-input" value="${rarityWeights[key]}" min="0" max="9999">
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function saveWeights() {
+            Object.keys(rarityWeights).forEach(key => {
+                const input = document.getElementById(`weight-${key}`);
+                const val = parseInt(input.value);
+                rarityWeights[key] = isNaN(val) || val < 0 ? 0 : val;
+            });
+            
+            localStorage.setItem('steam_roulette_weights', JSON.stringify(rarityWeights));
+            updateStats(); 
+            alert('Шансы выпадения успешно обновлены!');
+        }
         
         function saveLibrary() { localStorage.setItem('steam_roulette_library', JSON.stringify(myGames)); }
 
@@ -845,7 +919,7 @@
             } else { document.body.style.overflow = ''; }
         }
 
-function renderLibrary() {
+        function renderLibrary() {
             const grid = document.getElementById('library-grid'); 
             grid.innerHTML = '';
             
