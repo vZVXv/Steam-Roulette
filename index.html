@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Steam Roulette v2.7</title>
+    <title>Steam Roulette v2.8</title>
     <style>
         html, body {
             -ms-overflow-style: none; 
@@ -151,6 +151,40 @@
             border-radius: 4px; 
             border-left: 3px solid; 
         }
+		/* Спиннер для фоновой загрузки картинок */
+        @keyframes spin { 
+            0% { transform: translateY(-50%) rotate(0deg); } 
+            100% { transform: translateY(-50%) rotate(360deg); } 
+        }
+        
+        #bg-image-loader {
+            display: none; /* Скрыт по умолчанию */
+            align-items: center;
+            background: #16202d;
+            padding: 10px 20px 10px 45px;
+            border-radius: 4px;
+            border: 1px solid #2a475e;
+            color: #66c0f4;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            position: relative;
+            transition: opacity 0.5s;
+        }
+
+        #bg-image-loader::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #2a475e;
+            border-top-color: #66c0f4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+		#bg-image-loader.done::before { display: none; }
     </style>
 </head>
 <body>
@@ -188,12 +222,16 @@
             <div id="track" class="track"></div>
         </div>
 
-        <div class="controls">
+<div class="controls">
             <button id="spin-btn" onclick="spin()" disabled>Крутить</button>
             <button id="launch-btn" onclick="launchGame()">Запустить игру</button>
             <button id="lib-btn" onclick="toggleLibrary(true)" style="background: #2a475e;">Библиотека</button>
             <button id="ach-btn" onclick="toggleAchievements(true)" style="background: #4b6b22;">Достижения</button>
             <button id="settings-btn" onclick="toggleSettings(true)" style="background: #5a6a7e;">⚙️ Настройки</button>
+            
+            <div id="bg-image-loader">
+                <span id="bg-loader-text">Кэширование: 0%</span>
+            </div>
         </div>
 
         <div class="history">
@@ -347,7 +385,7 @@
         document.addEventListener('contextmenu', event => event.preventDefault());
 
         const CONFIG = {
-            version: "v2.7",
+            version: "v2.8",
             LINKS: {
                 steamImg: "https://shared.fastly.steamstatic.com",
                 steamRun: "steam://run/",
@@ -357,7 +395,7 @@
 
         if ('serviceWorker' in navigator) {
             const swCode = `
-                const CACHE_NAME = 'steam-images-v2.7';
+                const CACHE_NAME = 'steam-images-v2.8';
                 self.addEventListener('fetch', (event) => {
                     if (event.request.url.includes('steamstatic.com')) {
                         event.respondWith(
@@ -1222,8 +1260,51 @@
                 if (confirm(`ЗАПУСТИТЬ ${lastWonGame.name}?`)) window.location.href = `${CONFIG.LINKS.steamRun}${lastWonGame.id}`;
             } else alert("Сначала прокрутите рулетку!");
         }
-
-        window.onload = () => { 
+// Фоновая загрузка и кэширование картинок
+        function backgroundPreloadImages(games) {
+            const loaderDiv = document.getElementById('bg-image-loader');
+            const loaderText = document.getElementById('bg-loader-text');
+            
+            if (!games || games.length === 0) return;
+            
+            loaderDiv.style.display = 'inline-flex';
+            loaderDiv.style.opacity = '1';
+            
+            let loadedCount = 0;
+            const totalCount = games.length;
+            
+            games.forEach(game => {
+                const imgUrl = `${CONFIG.LINKS.steamImg}/store_item_assets/steam/apps/${game.id}/header.jpg`;
+                const img = new Image();
+                
+                const updateCounter = () => {
+                    loadedCount++;
+                    const percent = Math.round((loadedCount / totalCount) * 100);
+                    loaderText.textContent = `Кэширование: ${percent}% (${loadedCount}/${totalCount})`;
+                    
+                    // Когда всё загружено
+                    if (loadedCount === totalCount) {
+                        loaderDiv.style.border = '1px solid #32cd32';
+                        loaderDiv.style.color = '#32cd32';
+                        loaderText.textContent = 'Все картинки в кэше!';
+                        // Убираем спиннер
+                        loaderDiv.style.setProperty('--pseudo-display', 'none'); 
+                        
+                        // Плавно скрываем плашку через 3 секунды
+                        setTimeout(() => {
+                            loaderDiv.style.opacity = '0';
+                            setTimeout(() => loaderDiv.style.display = 'none', 500);
+                        }, 3000);
+                    }
+                };
+                
+                img.onload = updateCounter;
+                img.onerror = updateCounter; 
+                // Присвоение src начинает скачивание, а Service Worker кладет это в кэш браузера
+                img.src = imgUrl; 
+            });
+        }
+window.onload = () => { 
             const versionDisplay = document.getElementById('app-version-start');
             if (versionDisplay) versionDisplay.textContent = CONFIG.version;
             
@@ -1233,6 +1314,9 @@
                 myGames = JSON.parse(savedLibrary);
                 document.getElementById('main-app').style.display = 'flex';
                 finalizeDataLoad("Библиотека восстановлена из памяти!");
+                
+                // ВЫЗЫВАЕМ ФОНОВУЮ ЗАГРУЗКУ
+                backgroundPreloadImages(myGames);
             }
             
             const saved = JSON.parse(localStorage.getItem('rouletteHistory') || '[]'); 
